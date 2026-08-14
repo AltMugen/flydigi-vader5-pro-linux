@@ -5,19 +5,53 @@ set -e
 
 echo "Installing Flydigi Vader 5 Pro driver and utilities..."
 
+# Pre-flight build tool check
+MISSING_TOOLS=()
+for tool in gcc cmake ninja git python3 wget curl; do
+    if ! command -v "$tool" &>/dev/null; then
+        MISSING_TOOLS+=("$tool")
+    fi
+done
+
+if [ ${#MISSING_TOOLS[@]} -ne 0 ]; then
+    echo "Error: Missing required build tools: ${MISSING_TOOLS[*]}"
+    echo ""
+    echo "Please install prerequisites for your Linux distribution:"
+    echo "  Ubuntu/Debian: sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev"
+    echo "  Fedora:        sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel"
+    echo "  Arch Linux:    sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext"
+    echo "  openSUSE:      sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel"
+    exit 1
+fi
+
 # 1. Fetch and install padctl
 echo "Installing padctl daemon..."
 TMP_DIR=$(mktemp -d)
 cd "$TMP_DIR"
 URL=$(curl -s https://api.github.com/repos/BANANASJIM/padctl/releases/latest | grep "browser_download_url.*x86_64-linux-musl.tar.gz" | cut -d '"' -f 4)
+
+if [ -z "$URL" ]; then
+    echo "Error: Could not retrieve padctl release URL from GitHub API."
+    exit 1
+fi
+
 wget -q --show-progress -O padctl.tar.gz "$URL"
 tar -xf padctl.tar.gz
-sudo cp padctl /usr/bin/padctl
-sudo chmod +x /usr/bin/padctl
+
+PADCTL_BIN=$(find . -name "padctl" -type f | head -n 1)
+if [ -n "$PADCTL_BIN" ]; then
+    sudo cp "$PADCTL_BIN" /usr/bin/padctl
+    sudo chmod +x /usr/bin/padctl
+else
+    echo "Error: Could not find padctl binary in extracted archive!"
+    exit 1
+fi
+
+cd - >/dev/null
 rm -rf "$TMP_DIR"
 
 # 2. Prepare and build patched SDL3
-echo "🛠️ Building patched SDL3 library..."
+echo "Building patched SDL3 library..."
 SDL_SRC="$HOME/sdl-build/SDL-3.4.4"
 
 if [ ! -d "$SDL_SRC" ]; then

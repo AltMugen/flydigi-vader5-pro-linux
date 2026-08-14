@@ -1,6 +1,3 @@
-
----
-
 # Flydigi Vader 5 Pro Linux Setup & Fixes
 
 [English](#english) | [Русский](#русский)
@@ -15,6 +12,26 @@ Linux support and custom fixes for **Flydigi Vader 5 Pro** (2.4G dongle USB ID `
 - **Custom SDL3 Rumble & Input Sticking Fix**: Introduces a **2x Burst (22ms safety window) & Deduplication algorithm** into the patched SDL3 library. This eliminates input drops and rumble sticking caused by the Flydigi 2.4G receiver's ~18ms hardware pause on vendor channel IF1.
 - **Switcher Utility (`vader5`)**: Toggle between Steam Native mode and Padctl mode.
 - **Automated Installer**: Downloads `padctl`, compiles the patched SDL3 library, and sets up udev rules.
+
+### Prerequisites (Dependencies)
+Before running `install.sh`, make sure build dependencies are installed on your Linux distribution:
+
+- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
+  ```bash
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev
+  ```
+- **Fedora / Nobara / Bazzite**:
+  ```bash
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel
+  ```
+- **Arch Linux / Manjaro / EndeavourOS**:
+  ```bash
+  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext
+  ```
+- **openSUSE**:
+  ```bash
+  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel
+  ```
 
 ### Important Note About Padctl Configuration
 While `install.sh` automatically fetches and installs the `padctl` daemon, **`padctl` requires separate configuration for custom button mappings, macros, or stick curves**.
@@ -53,6 +70,26 @@ vader5 status   # (or 'vader5 s') Show current active mode
 - **Утилита переключения (`vader5`)**: Переключение между нативным режимом Steam и режимом Padctl.
 - **Автоматический установщик**: Скачивает `padctl`, компилирует пропатченный SDL3 и устанавливает правила `udev`.
 
+### Требования (Зависимости)
+Перед запуском `install.sh` убедитесь, что в вашей системе установлены необходимые инструменты сборки:
+
+- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
+  ```bash
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev
+  ```
+- **Fedora / Nobara / Bazzite**:
+  ```bash
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel
+  ```
+- **Arch Linux / Manjaro / EndeavourOS**:
+  ```bash
+  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext
+  ```
+- **openSUSE**:
+  ```bash
+  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel
+  ```
+
 ### Важное примечание по настройке Padctl
 Скрипт `install.sh` автоматически скачивает и запускает `padctl`, но **сам `padctl` требует отдельной настройки для кастомных маппингов, макросов или кривых стиков**.
 - По умолчанию `padctl` работает как стандартный геймпад Xbox Elite Series 2.
@@ -78,5 +115,3 @@ vader5 padctl   # (или 'vader5 p') Включить режим Padctl (Xbox E
 vader5 update   # (или 'vader5 u') Обновить пропатченные библиотеки в Steam
 vader5 status   # (или 'vader5 s') Показать текущий активный режим
 ```
-
----
