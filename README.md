@@ -18,19 +18,19 @@ Before running `install.sh`, make sure build dependencies are installed on your 
 
 - **Ubuntu / Debian / Pop!_OS / Linux Mint**:
   ```bash
-  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
   ```
 - **Fedora / Nobara / Bazzite**:
   ```bash
-  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
   ```
 - **Arch Linux / Manjaro / EndeavourOS**:
   ```bash
-  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext
+  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
   ```
 - **openSUSE**:
   ```bash
-  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel
+  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
   ```
 
 ### Important Note About Padctl Configuration
@@ -75,19 +75,19 @@ vader5 status   # (or 'vader5 s') Show current active mode
 
 - **Ubuntu / Debian / Pop!_OS / Linux Mint**:
   ```bash
-  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
   ```
 - **Fedora / Nobara / Bazzite**:
   ```bash
-  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
   ```
 - **Arch Linux / Manjaro / EndeavourOS**:
   ```bash
-  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext
+  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
   ```
 - **openSUSE**:
   ```bash
-  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel
+  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
   ```
 
 ### Важное примечание по настройке Padctl
@@ -114,4 +114,3 @@ vader5 native   # (или 'vader5 n') Включить нативный режи
 vader5 padctl   # (или 'vader5 p') Включить режим Padctl (Xbox Elite)
 vader5 update   # (или 'vader5 u') Обновить пропатченные библиотеки в Steam
 vader5 status   # (или 'vader5 s') Показать текущий активный режим
-```

@@ -17,10 +17,10 @@ if [ ${#MISSING_TOOLS[@]} -ne 0 ]; then
     echo "Error: Missing required build tools: ${MISSING_TOOLS[*]}"
     echo ""
     echo "Please install prerequisites for your Linux distribution:"
-    echo "  Ubuntu/Debian: sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev"
-    echo "  Fedora:        sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel"
-    echo "  Arch Linux:    sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext"
-    echo "  openSUSE:      sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel"
+    echo "  Ubuntu/Debian: sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev"
+    echo "  Fedora:        sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel"
+    echo "  Arch Linux:    sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst"
+    echo "  openSUSE:      sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel"
     exit 1
 fi
 
