@@ -168,10 +168,10 @@ new_rumble = """static bool HIDAPI_DriverFlydigi_RumbleJoystick(SDL_HIDAPI_Devic
         SDL_zeroa(raw_packet);
         SDL_memcpy(&raw_packet[1], &rumble_packet[1], sizeof(rumble_packet) - 1);
         if (SDL_HIDAPI_SendRumble(device, raw_packet, sizeof(raw_packet)) != sizeof(raw_packet)) {
-            return SDL_SetError("Couldn\'t send rumble packet");
+            return SDL_SetError("Could not send rumble packet");
         }
     } else if (SDL_HIDAPI_SendRumble(device, rumble_packet, sizeof(rumble_packet)) != sizeof(rumble_packet)) {
-        return SDL_SetError("Couldn\'t send rumble packet");
+        return SDL_SetError("Could not send rumble packet");
     }
 
     return true;
