@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+
+# Path configurations
+SDL_RULE="/etc/udev/rules.d/60-vader5-sdl.rules"
+PADCTL_RULE="/etc/udev/rules.d/60-padctl.rules"
+DRIVER_DIR="$HOME/.local/share/vader5-driver/sdl"
+STEAM_DIR="$HOME/.local/share/Steam"
+
+# Language detection (Ru/En)
+IS_RU=false
+if [[ "${LANG:-}" =~ ^ru || "${LC_ALL:-}" =~ ^ru || "${LC_MESSAGES:-}" =~ ^ru ]]; then
+    IS_RU=true
+fi
+
+reload_udev() {
+    sudo udevadm control --reload-rules && sudo udevadm trigger
+}
+
+patch_sdl() {
+    if [ "$IS_RU" = true ]; then
+        echo "📦 Обновление библиотек SDL3 в Steam..."
+    else
+        echo "📦 Updating SDL3 libraries in Steam..."
+    fi
+
+    if [ ! -d "$DRIVER_DIR" ]; then
+        if [ "$IS_RU" = true ]; then
+            echo "❌ Ошибка: Папка с собранным драйвером $DRIVER_DIR не найдена!"
+        else
+            echo "❌ Error: Driver directory $DRIVER_DIR not found!"
+        fi
+        exit 1
+    fi
+
+    # 1. Native Steam64
+    if [ -f "$STEAM_DIR/ubuntu12_64/libSDL3.so.0" ]; then
+        echo " -> Patching ubuntu12_64..."
+        SIZE64=$(stat -c%s "$STEAM_DIR/ubuntu12_64/libSDL3.so.0")
+        cp "$DRIVER_DIR/libSDL3-64.so.0" "$STEAM_DIR/ubuntu12_64/libSDL3.so.0"
+        truncate -s $SIZE64 "$STEAM_DIR/ubuntu12_64/libSDL3.so.0"
+        sudo install -m644 "$DRIVER_DIR/sdl3_shim64.so" "$STEAM_DIR/ubuntu12_64/sdl3_shim.so" 2>/dev/null || true
+    fi
+
+    # 2. Native Steam32
+    if [ -f "$STEAM_DIR/ubuntu12_32/libSDL3.so.0" ]; then
+        echo " -> Patching ubuntu12_32..."
+        SIZE32=$(stat -c%s "$STEAM_DIR/ubuntu12_32/libSDL3.so.0")
+        cp "$DRIVER_DIR/libSDL3-32.so.0" "$STEAM_DIR/ubuntu12_32/libSDL3.so.0"
+        truncate -s $SIZE32 "$STEAM_DIR/ubuntu12_32/libSDL3.so.0"
+        sudo install -m644 "$DRIVER_DIR/sdl3_shim32.so" "$STEAM_DIR/ubuntu12_32/sdl3_shim.so" 2>/dev/null || true
+    fi
+
+    # 3. STEAMRT3 CLIENT (steamrt64)
+    if [ -f "$STEAM_DIR/steamrt64/libSDL3.so.0" ]; then
+        echo " -> Patching steamrt64..."
+        SIZE_RT64=$(stat -c%s "$STEAM_DIR/steamrt64/libSDL3.so.0")
+        cp "$DRIVER_DIR/libSDL3-64.so.0" "$STEAM_DIR/steamrt64/libSDL3.so.0"
+        truncate -s $SIZE_RT64 "$STEAM_DIR/steamrt64/libSDL3.so.0"
+        sudo install -m644 "$DRIVER_DIR/sdl3_shim64.so" "$STEAM_DIR/steamrt64/sdl3_shim.so" 2>/dev/null || true
+    fi
+
+    if [ "$IS_RU" = true ]; then
+        echo "✅ Готово! Патч применён."
+    else
+        echo "✅ Done! Patch applied."
+    fi
+}
+
+mode_native() {
+    if [ "$IS_RU" = true ]; then
+        echo "🎮 Переключаемся в STEAM NATIVE..."
+    else
+        echo "🎮 Switching to STEAM NATIVE..."
+    fi
+
+    systemctl --user stop padctl 2>/dev/null
+
+    # Disable padctl rules, enable SDL rules
+    [ -f "${PADCTL_RULE}" ] && sudo mv "${PADCTL_RULE}" "${PADCTL_RULE}.disabled"
+    [ -f "${SDL_RULE}.disabled" ] && sudo mv "${SDL_RULE}.disabled" "${SDL_RULE}"
+
+    reload_udev
+
+    if [ "$IS_RU" = true ]; then
+        echo "✅ Режим STEAM NATIVE активен. Переподключите USB-донгл."
+    else
+        echo "✅ STEAM NATIVE mode active. Unplug and replug the USB dongle."
+    fi
+}
+
+mode_padctl() {
+    if [ "$IS_RU" = true ]; then
+        echo "🕹️ Переключаемся в PADCTL (Виртуальный Xbox Elite)..."
+    else
+        echo "🕹️ Switching to PADCTL (Virtual Xbox Elite)..."
+    fi
+
+    # Disable SDL rules, enable padctl rules
+    [ -f "${SDL_RULE}" ] && sudo mv "${SDL_RULE}" "${SDL_RULE}.disabled"
+    [ -f "${PADCTL_RULE}.disabled" ] && sudo mv "${PADCTL_RULE}.disabled" "${PADCTL_RULE}"
+
+    reload_udev
+    systemctl --user start padctl
+
+    if [ "$IS_RU" = true ]; then
+        echo "✅ Режим PADCTL активен. Переподключите USB-донгл."
+    else
+        echo "✅ PADCTL mode active. Unplug and replug the USB dongle."
+    fi
+}
+
+show_status() {
+    if systemctl --user is-active --quiet padctl 2>/dev/null; then
+        if [ "$IS_RU" = true ]; then
+            echo "Текущий режим: 🕹️ PADCTL (Виртуальный Xbox Elite)"
+        else
+            echo "Current mode: 🕹️ PADCTL (Virtual Xbox Elite)"
+        fi
+    else
+        if [ "$IS_RU" = true ]; then
+            echo "Текущий режим: 🎮 STEAM NATIVE (Пропатченный SDL3)"
+        else
+            echo "Current mode: 🎮 STEAM NATIVE (Patched SDL3)"
+        fi
+    fi
+}
+
+case "$1" in
+    n|native) mode_native ;;
+    p|padctl) mode_padctl ;;
+    u|update) patch_sdl ;;
+    s|status) show_status ;;
+    *)
+        if [ "$IS_RU" = true ]; then
+            echo "Использование: vader5 [native|padctl|update|status]"
+            echo "               vader5 [n|p|u|s]"
+        else
+            echo "Usage: vader5 [native|padctl|update|status]"
+            echo "       vader5 [n|p|u|s]"
+        fi
+        show_status
+        ;;
+esac
