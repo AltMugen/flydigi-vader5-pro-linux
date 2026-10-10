@@ -1,116 +1,54 @@
-# Flydigi Vader 5 Pro Linux Setup & Fixes
+# Flydigi Vader 5 Pro on Linux
 
-[English](#english) | [Русский](#русский)
-
----
-
-## English
-
-Linux support and custom fixes for **Flydigi Vader 5 Pro** (2.4G dongle USB ID `37d7:2401`).
-
-### What this repository includes
-- **Custom SDL3 Rumble & Input Sticking Fix**: Introduces a **2x Burst (22ms safety window) & Deduplication algorithm** into the patched SDL3 library. This eliminates input drops and rumble sticking caused by the Flydigi 2.4G receiver's ~18ms hardware pause on vendor channel IF1.
-- **Switcher Utility (`vader5`)**: Toggle between Steam Native mode and Padctl mode.
-- **Automated Installer**: Downloads `padctl`, compiles the patched SDL3 library, and sets up udev rules.
-
-### Prerequisites (Dependencies)
-Before running `install.sh`, make sure build dependencies are installed on your Linux distribution:
-
-- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
-  ```bash
-  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
-  ```
-- **Fedora / Nobara / Bazzite**:
-  ```bash
-  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
-  ```
-- **Arch Linux / Manjaro / EndeavourOS**:
-  ```bash
-  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
-  ```
-- **openSUSE**:
-  ```bash
-  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
-  ```
-
-### Important Note About Padctl Configuration
-While `install.sh` automatically fetches and installs the `padctl` daemon, **`padctl` requires separate configuration for custom button mappings, macros, or stick curves**.
-- Default `padctl` config behaves as a standard Xbox Elite Series 2 controller.
-- To configure custom paddle mappings or profiles in Padctl mode, edit `~/.config/padctl/config.toml` or use `padctl` CLI.
-- Refer to the official [padctl documentation](https://github.com/BANANASJIM/padctl) for mapping syntax.
-
-### Credits & References
-- [BANANASJIM/padctl](https://github.com/BANANASJIM/padctl) — For research and diagnosing the ~18ms hardware receiver freeze on vendor channel IF1 ([Issue #503](https://github.com/BANANASJIM/padctl/issues/503), [PR #505](https://github.com/BANANASJIM/padctl/pull/505), [PR #506](https://github.com/BANANASJIM/padctl/pull/506), [PR #508](https://github.com/BANANASJIM/padctl/pull/508)).
-- **firefloc** ([vader5-pro-linux-fix Issue #8](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8)) — For the Steam direct replace & size truncation methodology (`truncate`) to bypass Steam verification loops.
-
-### Installation
-```bash
-git clone https://github.com/AltMugen/flydigi-vader5-pro-linux.git
-cd flydigi-vader5-pro-linux
-chmod +x install.sh vader5
-./install.sh
-```
-
-### CLI Usage (`vader5`)
-```bash
-vader5 native   # (or 'vader5 n') Switch to Steam Native mode
-vader5 padctl   # (or 'vader5 p') Switch to Padctl mode (Virtual Xbox Elite)
-vader5 update   # (or 'vader5 u') Re-apply patched SDL3 libraries to Steam
-vader5 status   # (or 'vader5 s') Show current active mode
-```
-
----
+[Русский](#русский) · [English](#english)
 
 ## Русский
 
-Поддержка и исправление багов для **Flydigi Vader 5 Pro** на Linux (2.4G донгл USB ID `37d7:2401`).
+Настройка Flydigi Vader 5 Pro с USB-донглом `37d7:2401` для нативного Steam (в том числе Steam RT3) на Fedora GNOME. SDL читает расширенные кнопки и гироскоп через HID-интерфейс 1. В экспериментальном варианте вибрация уходит через отдельный Xbox-интерфейс 0. `xpad` отключается от интерфейса 0, чтобы Steam не видел второй геймпад.
 
-### Что входит в репозиторий
-- **Фикс вибрации и залипаний для SDL3 в Steam**: Внедрен алгоритм **Двойного залпа (2x Burst с окном безопасности 22 мс) и дедупликации** в библиотеку SDL3. Решает проблему потери нажатий и залипания вибрации, вызванную аппаратным зависанием донгла Flydigi (~18 мс на команду) на вендорном канале IF1.
-- **Утилита переключения (`vader5`)**: Переключение между нативным режимом Steam и режимом Padctl.
-- **Автоматический установщик**: Скачивает `padctl`, компилирует пропатченный SDL3 и устанавливает правила `udev`.
+### Состояние и ограничения
 
-### Требования (Зависимости)
-Перед запуском `install.sh` убедитесь, что в вашей системе установлены необходимые инструменты сборки:
+- Путь вибрации через Xbox endpoint **собран, но не проверен на реальном донгле**. Маленький пользовательский сервис отправляет стандартный 8-байтный пакет на endpoint `0x05`; SDL передаёт ему значения моторов через сокет в `XDG_RUNTIME_DIR`. В этом пути нет тройного залпа, задержки 20–22 мс или записи вибрации в HID-интерфейс 1.
+- Сборка закреплена за SDL `release-3.4.4`. Патч хранится в [`patches/sdl-flydigi-vader5-linux.patch`](patches/sdl-flydigi-vader5-linux.patch), а не генерируется заменами текста в установщике.
+- По умолчанию собирается 64-битная библиотека для `steamrt64` и `ubuntu12_64`. Для 32-битной поставьте multilib-зависимости и запустите `BUILD_32=1 ./build.sh`. Без неё `ubuntu12_32` пропускается.
+- Библиотека, собранная на Fedora, может требовать её версию glibc. Перед применением к другой системе проверьте `readelf --version-info` или соберите в совместимом Steam Runtime SDK. Указанный [разбор Steam Runtime](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8) также сообщает о минимальной прошивке Vader 5 Pro `0x7141`.
+- Steam обновляет свои SDL-файлы. После обновления клиента закройте Steam и выполните `vader5 update`.
 
-- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
-  ```bash
-  sudo apt update && sudo apt install -y git build-essential cmake ninja-build python3 wget curl libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
-  ```
-- **Fedora / Nobara / Bazzite**:
-  ```bash
-  sudo dnf install -y git gcc gcc-c++ cmake ninja-build python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
-  ```
-- **Arch Linux / Manjaro / EndeavourOS**:
-  ```bash
-  sudo pacman -S --needed git base-devel cmake ninja python wget curl libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
-  ```
-- **openSUSE**:
-  ```bash
-  sudo zypper install -y git gcc gcc-c++ cmake ninja python3 wget curl libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
-  ```
+### Сборка и установка (Fedora)
 
-### Важное примечание по настройке Padctl
-Скрипт `install.sh` автоматически скачивает и запускает `padctl`, но **сам `padctl` требует отдельной настройки для кастомных маппингов, макросов или кривых стиков**.
-- По умолчанию `padctl` работает как стандартный геймпад Xbox Elite Series 2.
-- Для настройки лепестков и профилей в режиме Padctl редактируйте `~/.config/padctl/config.toml` или используйте CLI `padctl`.
-- Подробную документацию смотрите в официальном [репозитории padctl](https://github.com/BANANASJIM/padctl).
-
-### Благодарности и ссылки
-- [BANANASJIM/padctl](https://github.com/BANANASJIM/padctl) — За исследование и обнаружение 18-миллисекундного аппаратного зависания приемника Flydigi при отправке команд вибрации ([Issue #503](https://github.com/BANANASJIM/padctl/issues/503), [PR #505](https://github.com/BANANASJIM/padctl/pull/505), [PR #506](https://github.com/BANANASJIM/padctl/pull/506), [PR #508](https://github.com/BANANASJIM/padctl/pull/508)).
-- **firefloc** ([vader5-pro-linux-fix Issue #8](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8)) — За метод прямой подмены библиотек в Steam с подгонкой размера файлов (`truncate`).
-
-### Установка
 ```bash
-git clone https://github.com/AltMugen/flydigi-vader5-pro-linux.git
-cd flydigi-vader5-pro-linux
-chmod +x install.sh vader5
+sudo dnf install git gcc cmake ninja-build pkgconf-pkg-config libusb1-devel \
+  libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel \
+  libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
+./build.sh
 ./install.sh
 ```
 
-### Использование (`vader5`)
+`build.sh` использует `SDL_SOURCE_DIR`, `BUILD_DIR` и `OUTPUT_DIR`, если они заданы. Он работает в отдельном каталоге сборки и не меняет исходный checkout SDL. `install.sh` ставит правило udev, пользовательский сервис и команду `~/.local/bin/vader5`. Закройте Steam до запуска установки. При первой подмене библиотек `vader5 update` сохраняет исходный файл как `libSDL3.so.0.vader5-original` в соответствующем каталоге Steam. Если новая библиотека больше исходной или рядом нет штатного `sdl3_shim.so`, подмена прерывается.
+
 ```bash
-vader5 native   # (или 'vader5 n') Включить нативный режим Steam
-vader5 padctl   # (или 'vader5 p') Включить режим Padctl (Xbox Elite)
-vader5 update   # (или 'vader5 u') Обновить пропатченные библиотеки в Steam
-vader5 status   # (или 'vader5 s') Показать текущий активный режим
+vader5 native   # Steam + Xbox rumble bridge
+vader5 padctl   # Только если padctl уже установлен как user service
+vader5 update   # Повторно применить SDL после обновления Steam
+vader5 status
+systemctl --user status vader5-rumble
+journalctl --user -u vader5-rumble -b
+```
+
+После переключения переподключите донгл. Сервис Xbox-вибрации работает только в режиме `native`. Для `padctl` проект больше не скачивает непроверенный бинарный релиз автоматически: установите и настройте [padctl](https://github.com/BANANASJIM/padctl) отдельно, если он нужен.
+
+### Steam Input и кнопка R в Isaac
+
+Если лепесток назначен клавише `R` в конфигурации Steam Input для игры, GNOME Wayland может запросить «доступ к рабочему столу» при попытке Steam имитировать клавиатуру через механизм ввода рабочего стола. Это разрешение относится к синтетическому вводу клавиши, а не к чтению лепестка SDL. Исправление вибрации не устраняет этот запрос. Проверьте, что Steam применяет именно конфигурацию Isaac и что в Desktop Layout нет дублирующего назначения. [У Steam есть сообщения о подобных запросах даже во время игры](https://github.com/ValveSoftware/steam-for-linux/issues/13208). Разрешение портала следует оценивать отдельно; скрипты проекта его не меняют.
+
+### Устройство и диагностика
+
+На физическом донгле проверьте: Steam показывает один Vader 5 Pro, дополнительные кнопки и гироскоп видны; `vader5-rumble` активен; вибрация начинается и прекращается без залипания; при вибрации не теряются нажатия. Если endpoint занят, сервис сообщит `Interface 0 unavailable` в журнале. Протокол Xbox endpoint описан в [исследовании донгла](https://github.com/Chillsmeit/vader5pro-remap-driver/blob/main/docs/protocol.md). Формат расширенного ввода и альтернативной вибрации на интерфейсе 1 задокументирован в [padctl](https://github.com/BANANASJIM/padctl/blob/main/docs/src/devices/flydigi-flydigi-vader-5-pro.md).
+
+## English
+
+This repository configures the Flydigi Vader 5 Pro `37d7:2401` dongle for native Steam. SDL reads extra buttons and gyro through HID interface 1. An experimental user service sends rumble to the separate Xbox interface 0 while `xpad` is unbound, avoiding a duplicate controller. The Xbox rumble route compiles successfully but still needs a test on the physical dongle.
+
+On Fedora, install the build dependencies shown above, then run `./build.sh` and `./install.sh` with Steam closed. Use `vader5 native`, `vader5 padctl` (when padctl is installed separately), `vader5 update`, and `vader5 status`. Steam's original SDL files are backed up beside the replaced files. The default build is 64-bit; set `BUILD_32=1` after installing multilib dependencies to add 32-bit Steam support.
+
+Steam Input keyboard mappings such as an Isaac paddle bound to `R` can trigger GNOME Wayland's desktop input permission prompt. This is separate from SDL controller reading and rumble; this project does not change portal permissions.

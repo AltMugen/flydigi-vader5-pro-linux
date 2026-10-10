@@ -1,0 +1,10 @@
+[Unit]
+Description=Vader 5 Pro Xbox interface rumble bridge
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/vader5-rumble
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
