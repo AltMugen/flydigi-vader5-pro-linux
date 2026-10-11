@@ -11,7 +11,17 @@ if [[ "${LANG:-}" =~ ^ru || "${LC_ALL:-}" =~ ^ru || "${LC_MESSAGES:-}" =~ ^ru ]]
 fi
 
 reload_udev() {
+    if [[ -f "$DRIVER_DIR/60-vader5-sdl.rules" ]] && ! cmp -s "$DRIVER_DIR/60-vader5-sdl.rules" "$RULE"; then
+        sudo install -m 0644 "$DRIVER_DIR/60-vader5-sdl.rules" "$RULE"
+    fi
     sudo udevadm control --reload-rules
+    local usb
+    for usb in /sys/bus/usb/devices/*; do
+        [[ -f "$usb/idVendor" && -f "$usb/idProduct" ]] || continue
+        if [[ "$(cat "$usb/idVendor")" == 37d7 && "$(cat "$usb/idProduct")" == 2401 ]]; then
+            sudo udevadm trigger --action=add "$usb"
+        fi
+    done
     local interface parent
     for interface in /sys/bus/usb/drivers/xpad/*:1.0; do
         [[ -L "$interface" ]] || continue
@@ -23,18 +33,21 @@ reload_udev() {
 }
 
 patch_one() {
-    local arch="$1" directory="$2" source target shim original state
+    local arch="$1" directory="$2" source target shim shim_source original state backup_dir
     source="$DRIVER_DIR/libSDL3-$arch.so.0"
     target="$STEAM_DIR/$directory/libSDL3.so.0"
     shim="$STEAM_DIR/$directory/sdl3_shim.so"
-    [[ -f "$target" && -f "$source" && -f "$shim" ]] || return 0
+    shim_source="$DRIVER_DIR/sdl3_shim${arch}.so"
+    [[ -f "$target" && -f "$source" && -f "$shim_source" ]] || return 0
 
-    local old_size new_size temp current_hash
-    original="$target.vader5-original"
+    local old_size new_size current_hash
+    backup_dir="$DRIVER_DIR/originals/$directory"
+    original="$backup_dir/libSDL3.so.0"
     state="$DRIVER_DIR/$directory.last-patch.sha256"
     current_hash=$(sha256sum "$target")
     current_hash=${current_hash%% *}
     if [[ ! -f "$original" || ( -f "$state" && "$current_hash" != "$(cat "$state")" ) ]]; then
+        mkdir -p "$backup_dir"
         cp -p "$target" "$original"
     fi
 
@@ -49,14 +62,15 @@ patch_one() {
         return 1
     fi
 
-    temp=$(mktemp "$STEAM_DIR/$directory/.libSDL3.vader5.XXXXXX")
-    trap 'rm -f "$temp"' RETURN
-    cp "$source" "$temp"
-    truncate -s "$old_size" "$temp"
-    chmod --reference="$target" "$temp"
-    mv -f "$temp" "$target"
+    if [[ -f "$shim" && ! -f "$backup_dir/sdl3_shim.so" ]] && ! cmp -s "$shim" "$shim_source"; then
+        cp -p "$shim" "$backup_dir/sdl3_shim.so"
+    fi
+
+    # Keep the in-place copy and size-truncation behavior used by the original installer.
+    cp "$source" "$target"
+    truncate -s "$old_size" "$target"
+    sudo install -m 0644 "$shim_source" "$shim" 2>/dev/null || true
     sha256sum "$target" | cut -d ' ' -f 1 > "$state"
-    trap - RETURN
     echo " -> Patching $directory..."
 }
 
@@ -83,6 +97,19 @@ patch_sdl() {
         exit 1
     fi
 
+    # The legacy updater stored the pre-patch file size in-place. Recover the
+    # original stock files once before switching to backups outside Steam.
+    if [[ ! -f "$DRIVER_DIR/originals/steamrt64/libSDL3.so.0" && -f "$STEAM_DIR/steamrt64/libSDL3.so.0.vader5-original" ]]; then
+        mkdir -p "$DRIVER_DIR/originals/steamrt64"
+        cp -p "$STEAM_DIR/steamrt64/libSDL3.so.0.vader5-original" "$DRIVER_DIR/originals/steamrt64/libSDL3.so.0"
+        rm -f "$STEAM_DIR/steamrt64/libSDL3.so.0.vader5-original"
+    fi
+    if [[ ! -f "$DRIVER_DIR/originals/ubuntu12_64/libSDL3.so.0" && -f "$STEAM_DIR/ubuntu12_64/libSDL3.so.0.vader5-original" ]]; then
+        mkdir -p "$DRIVER_DIR/originals/ubuntu12_64"
+        cp -p "$STEAM_DIR/ubuntu12_64/libSDL3.so.0.vader5-original" "$DRIVER_DIR/originals/ubuntu12_64/libSDL3.so.0"
+        rm -f "$STEAM_DIR/ubuntu12_64/libSDL3.so.0.vader5-original"
+    fi
+
     patch_one 64 ubuntu12_64
     if [[ -f "$DRIVER_DIR/32-bit-build.enabled" ]]; then
         patch_one 32 ubuntu12_32
@@ -106,9 +133,9 @@ mode_native() {
         if [[ "$IS_RU" == true ]]; then echo "❌ Не найдено $RULE. Запустите ./install.sh"; else echo "❌ Missing $RULE. Run ./install.sh"; fi
         exit 1
     }
-    systemctl --user stop padctl 2>/dev/null || true
-    systemctl --user start vader5-rumble
+    systemctl --user disable --now padctl 2>/dev/null || true
     reload_udev
+    systemctl --user --quiet enable --now vader5-rumble
     if [[ "$IS_RU" == true ]]; then
         echo "✅ Режим STEAM NATIVE активен. Вытащи и вставь USB-донгл."
     else
@@ -122,9 +149,9 @@ mode_padctl() {
     else
         echo "🕹️ Switching to PADCTL (Virtual Xbox Elite)..."
     fi
-    systemctl --user stop vader5-rumble 2>/dev/null || true
-    systemctl --user start padctl
+    systemctl --user disable --now vader5-rumble 2>/dev/null || true
     reload_udev
+    systemctl --user --quiet enable --now padctl
     if [[ "$IS_RU" == true ]]; then
         echo "✅ Режим PADCTL активен. Вытащи и вставь USB-донгл."
     else

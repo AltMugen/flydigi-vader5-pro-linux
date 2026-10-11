@@ -1,5 +1,6 @@
 [Unit]
 Description=Vader 5 Pro Xbox interface rumble bridge
+Conflicts=padctl.service
 
 [Service]
 Type=simple
