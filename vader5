@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 RULE=/etc/udev/rules.d/60-vader5-sdl.rules
 DRIVER_DIR="${VADER5_DRIVER_DIR:-$HOME/.local/share/vader5-driver/sdl}"
 STEAM_DIR="${VADER5_STEAM_DIR:-$HOME/.local/share/Steam}"
+
+IS_RU=false
+if [[ "${LANG:-}" =~ ^ru || "${LC_ALL:-}" =~ ^ru || "${LC_MESSAGES:-}" =~ ^ru ]]; then
+    IS_RU=true
+fi
+
 reload_udev() {
     sudo udevadm control --reload-rules
     local interface parent
@@ -13,25 +20,35 @@ reload_udev() {
             printf '%s' "${interface##*/}" | sudo tee /sys/bus/usb/drivers/xpad/unbind >/dev/null
         fi
     done
-    echo 'Reconnect the USB dongle to apply the new mode.'
 }
+
 patch_one() {
-    local arch="$1" directory="$2" source
+    local arch="$1" directory="$2" source target shim original state
     source="$DRIVER_DIR/libSDL3-$arch.so.0"
-    local target="$STEAM_DIR/$directory/libSDL3.so.0" shim="$STEAM_DIR/$directory/sdl3_shim.so"
-    [[ -f "$target" ]] || return 0
-    [[ -f "$source" ]] || { echo "Skipping $directory: no $source" >&2; return 0; }
-    [[ -f "$shim" ]] || { echo "Skipping $directory: missing Steam sdl3_shim.so" >&2; return 0; }
-    local original="$target.vader5-original" state="$DRIVER_DIR/$directory.last-patch.sha256"
+    target="$STEAM_DIR/$directory/libSDL3.so.0"
+    shim="$STEAM_DIR/$directory/sdl3_shim.so"
+    [[ -f "$target" && -f "$source" && -f "$shim" ]] || return 0
+
     local old_size new_size temp current_hash
+    original="$target.vader5-original"
+    state="$DRIVER_DIR/$directory.last-patch.sha256"
     current_hash=$(sha256sum "$target")
     current_hash=${current_hash%% *}
     if [[ ! -f "$original" || ( -f "$state" && "$current_hash" != "$(cat "$state")" ) ]]; then
         cp -p "$target" "$original"
     fi
+
     old_size=$(stat -c %s "$original")
     new_size=$(stat -c %s "$source")
-    (( new_size <= old_size )) || { echo "Skipping $directory: patched SDL is larger than stock SDL" >&2; return 1; }
+    if (( new_size > old_size )); then
+        if [[ "$IS_RU" == true ]]; then
+            echo "❌ Ошибка: пропатченная SDL больше оригинала ($directory)."
+        else
+            echo "❌ Error: patched SDL is larger than the original ($directory)."
+        fi
+        return 1
+    fi
+
     temp=$(mktemp "$STEAM_DIR/$directory/.libSDL3.vader5.XXXXXX")
     trap 'rm -f "$temp"' RETURN
     cp "$source" "$temp"
@@ -40,44 +57,102 @@ patch_one() {
     mv -f "$temp" "$target"
     sha256sum "$target" | cut -d ' ' -f 1 > "$state"
     trap - RETURN
-    echo "Patched $directory ($new_size bytes, padded to $old_size)."
+    echo " -> Patching $directory..."
 }
+
 patch_sdl() {
-    [[ -d "$DRIVER_DIR" ]] || { echo "Build first: ./build.sh" >&2; exit 1; }
-    if pgrep -x steamwebhelper >/dev/null || pgrep -x steam >/dev/null; then
-        echo 'Close Steam completely before updating its SDL libraries.' >&2
+    if [[ "$IS_RU" == true ]]; then
+        echo "📦 Обновление библиотек SDL3 в Steam..."
+    else
+        echo "📦 Updating SDL3 libraries in Steam..."
+    fi
+    if [[ ! -d "$DRIVER_DIR" ]]; then
+        if [[ "$IS_RU" == true ]]; then
+            echo "❌ Ошибка: папка с собранным драйвером $DRIVER_DIR не найдена!"
+        else
+            echo "❌ Error: driver directory $DRIVER_DIR not found!"
+        fi
         exit 1
     fi
-    patch_one 64 steamrt64
+    if pgrep -x steamwebhelper >/dev/null || pgrep -x steam >/dev/null; then
+        if [[ "$IS_RU" == true ]]; then
+            echo "❌ Ошибка: полностью закройте Steam перед обновлением SDL3."
+        else
+            echo "❌ Error: close Steam completely before updating SDL3."
+        fi
+        exit 1
+    fi
+
     patch_one 64 ubuntu12_64
-    patch_one 32 ubuntu12_32
+    if [[ -f "$DRIVER_DIR/32-bit-build.enabled" ]]; then
+        patch_one 32 ubuntu12_32
+    fi
+    patch_one 64 steamrt64
+
+    if [[ "$IS_RU" == true ]]; then
+        echo "✅ Готово! Патч применён."
+    else
+        echo "✅ Done! Patch applied."
+    fi
 }
+
 mode_native() {
-    [[ -f "$RULE" ]] || { echo "Missing $RULE; run ./install.sh" >&2; exit 1; }
+    if [[ "$IS_RU" == true ]]; then
+        echo "🎮 Переключаемся в STEAM NATIVE..."
+    else
+        echo "🎮 Switching to STEAM NATIVE..."
+    fi
+    [[ -f "$RULE" ]] || {
+        if [[ "$IS_RU" == true ]]; then echo "❌ Не найдено $RULE. Запустите ./install.sh"; else echo "❌ Missing $RULE. Run ./install.sh"; fi
+        exit 1
+    }
     systemctl --user stop padctl 2>/dev/null || true
     systemctl --user start vader5-rumble
     reload_udev
-    echo 'Steam native mode active.'
+    if [[ "$IS_RU" == true ]]; then
+        echo "✅ Режим STEAM NATIVE активен. Вытащи и вставь USB-донгл."
+    else
+        echo "✅ STEAM NATIVE mode active. Unplug and replug the USB dongle."
+    fi
 }
+
 mode_padctl() {
+    if [[ "$IS_RU" == true ]]; then
+        echo "🕹️ Переключаемся в PADCTL (Виртуальный Xbox Elite)..."
+    else
+        echo "🕹️ Switching to PADCTL (Virtual Xbox Elite)..."
+    fi
     systemctl --user stop vader5-rumble 2>/dev/null || true
     systemctl --user start padctl
     reload_udev
-    echo 'Padctl mode active.'
-}
-show_status() {
-    if systemctl --user is-active --quiet padctl; then
-        echo 'Mode: padctl'
-    elif systemctl --user is-active --quiet vader5-rumble; then
-        echo 'Mode: Steam native, Xbox rumble bridge active'
+    if [[ "$IS_RU" == true ]]; then
+        echo "✅ Режим PADCTL активен. Вытащи и вставь USB-донгл."
     else
-        echo 'Mode: neither service active'
+        echo "✅ PADCTL mode active. Unplug and replug the USB dongle."
     fi
 }
+
+show_status() {
+    if systemctl --user is-active --quiet padctl 2>/dev/null; then
+        if [[ "$IS_RU" == true ]]; then echo "Текущий режим: 🕹️ PADCTL (Виртуальный Xbox Elite)"; else echo "Current mode: 🕹️ PADCTL (Virtual Xbox Elite)"; fi
+    else
+        if [[ "$IS_RU" == true ]]; then echo "Текущий режим: 🎮 STEAM NATIVE (Пропатченный SDL3)"; else echo "Current mode: 🎮 STEAM NATIVE (Patched SDL3)"; fi
+    fi
+}
+
 case "${1:-status}" in
     n|native) mode_native ;;
     p|padctl) mode_padctl ;;
     u|update) patch_sdl ;;
     s|status) show_status ;;
-    *) echo 'Usage: vader5 {native|padctl|update|status}' >&2; exit 2 ;;
+    *)
+        if [[ "$IS_RU" == true ]]; then
+            echo "Использование: vader5 [native|padctl|update|status]"
+            echo "               vader5 [n|p|u|s]"
+        else
+            echo "Usage: vader5 [native|padctl|update|status]"
+            echo "       vader5 [n|p|u|s]"
+        fi
+        show_status
+        ;;
 esac

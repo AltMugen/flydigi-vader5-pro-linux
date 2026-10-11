@@ -1,54 +1,157 @@
-# Flydigi Vader 5 Pro on Linux
+# Flydigi Vader 5 Pro Linux Setup & Fixes
 
-[Русский](#русский) · [English](#english)
+[English](#english) | [Русский](#русский)
 
-## Русский
-
-Настройка Flydigi Vader 5 Pro с USB-донглом `37d7:2401` для нативного Steam (в том числе Steam RT3) на Fedora GNOME. SDL читает расширенные кнопки и гироскоп через HID-интерфейс 1. В экспериментальном варианте вибрация уходит через отдельный Xbox-интерфейс 0. `xpad` отключается от интерфейса 0, чтобы Steam не видел второй геймпад.
-
-### Состояние и ограничения
-
-- Путь вибрации через Xbox endpoint проверен на подключённом донгле: SDL обнаружила контроллер, вызов rumble прошёл через пользовательский сервис, а моторы отреагировали на импульс и остановились по stop-команде. Донгл сообщил версию прошивки `0x7153` (минимум драйвера — `0x7141`). Сервис передаёт стандартные 8-байтные команды на endpoint `0x05`, а SDL передаёт ему значения моторов через сокет в `XDG_RUNTIME_DIR`. В этом пути нет тройного залпа, задержки 20–22 мс или записи вибрации в HID-интерфейс 1.
-- Сборка закреплена за SDL `release-3.4.4`. Патч хранится в [`patches/sdl-flydigi-vader5-linux.patch`](patches/sdl-flydigi-vader5-linux.patch), а не генерируется заменами текста в установщике.
-- По умолчанию собирается 64-битная библиотека для `steamrt64` и `ubuntu12_64`. Для 32-битной поставьте multilib-зависимости и запустите `BUILD_32=1 ./build.sh`. Без неё `ubuntu12_32` пропускается.
-- Библиотека, собранная на Fedora, может требовать её версию glibc. Перед применением к другой системе проверьте `readelf --version-info` или соберите в совместимом Steam Runtime SDK. Указанный [разбор Steam Runtime](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8) также сообщает о минимальной прошивке Vader 5 Pro `0x7141`.
-- Steam обновляет свои SDL-файлы. После обновления клиента закройте Steam и выполните `vader5 update`.
-
-### Сборка и установка (Fedora)
-
-```bash
-sudo dnf install git gcc cmake ninja-build pkgconf-pkg-config libusb1-devel \
-  libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel \
-  libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
-./build.sh
-./install.sh
-```
-
-`build.sh` использует `SDL_SOURCE_DIR`, `BUILD_DIR` и `OUTPUT_DIR`, если они заданы. Он работает в отдельном каталоге сборки и не меняет исходный checkout SDL. `install.sh` ставит правило udev, пользовательский сервис и команду `~/.local/bin/vader5`. Закройте Steam до запуска установки. При первой подмене библиотек `vader5 update` сохраняет исходный файл как `libSDL3.so.0.vader5-original` в соответствующем каталоге Steam. Если новая библиотека больше исходной или рядом нет штатного `sdl3_shim.so`, подмена прерывается.
-
-```bash
-vader5 native   # Steam + Xbox rumble bridge
-vader5 padctl   # Только если padctl уже установлен как user service
-vader5 update   # Повторно применить SDL после обновления Steam
-vader5 status
-systemctl --user status vader5-rumble
-journalctl --user -u vader5-rumble -b
-```
-
-После переключения переподключите донгл. Сервис Xbox-вибрации работает только в режиме `native`. Для `padctl` проект больше не скачивает непроверенный бинарный релиз автоматически: установите и настройте [padctl](https://github.com/BANANASJIM/padctl) отдельно, если он нужен.
-
-### Steam Input и кнопка R в Isaac
-
-Если лепесток назначен клавише `R` в конфигурации Steam Input для игры, GNOME Wayland может запросить «доступ к рабочему столу» при попытке Steam имитировать клавиатуру через механизм ввода рабочего стола. Это разрешение относится к синтетическому вводу клавиши, а не к чтению лепестка SDL. Исправление вибрации не устраняет этот запрос. Проверьте, что Steam применяет именно конфигурацию Isaac и что в Desktop Layout нет дублирующего назначения. [У Steam есть сообщения о подобных запросах даже во время игры](https://github.com/ValveSoftware/steam-for-linux/issues/13208). Разрешение портала следует оценивать отдельно; скрипты проекта его не меняют.
-
-### Устройство и диагностика
-
-На физическом донгле проверьте: Steam показывает один Vader 5 Pro, дополнительные кнопки и гироскоп видны; `vader5-rumble` активен; вибрация начинается и прекращается без залипания; при вибрации не теряются нажатия. Если endpoint занят, сервис сообщит `Interface 0 unavailable` в журнале. Протокол Xbox endpoint описан в [исследовании донгла](https://github.com/Chillsmeit/vader5pro-remap-driver/blob/main/docs/protocol.md). Формат расширенного ввода и альтернативной вибрации на интерфейсе 1 задокументирован в [padctl](https://github.com/BANANASJIM/padctl/blob/main/docs/src/devices/flydigi-flydigi-vader-5-pro.md).
+---
 
 ## English
 
-This repository configures the Flydigi Vader 5 Pro `37d7:2401` dongle for native Steam. SDL reads extra buttons and gyro through HID interface 1. A user service sends rumble to the separate Xbox interface 0 while `xpad` is unbound, avoiding a duplicate controller. SDL-to-service rumble, the dongle transfer, and the physical motor response have been verified on hardware.
+Linux support and custom fixes for **Flydigi Vader 5 Pro** (2.4G dongle USB ID `37d7:2401`).
 
-On Fedora, install the build dependencies shown above, then run `./build.sh` and `./install.sh` with Steam closed. Use `vader5 native`, `vader5 padctl` (when padctl is installed separately), `vader5 update`, and `vader5 status`. Steam's original SDL files are backed up beside the replaced files. The default build is 64-bit; set `BUILD_32=1` after installing multilib dependencies to add 32-bit Steam support.
+### What this repository includes
 
-Steam Input keyboard mappings such as an Isaac paddle bound to `R` can trigger GNOME Wayland's desktop input permission prompt. This is separate from SDL controller reading and rumble; this project does not change portal permissions.
+- **SDL3 input and rumble fix**: SDL reads the extra controls and gyro from HID interface 1. Rumble is sent through the dongle's separate Xbox interface 0. The `xpad` driver is detached from that interface to avoid a duplicate controller. The previous repeated-burst rumble implementation is no longer used.
+- **Switcher utility (`vader5`)**: Switch between Steam Native mode and Padctl mode. The command output follows the system language (English or Russian).
+- **SDL build and installer**: Builds a patched SDL3 from the pinned `release-3.4.4` tag, installs the rumble service and udev rules, and patches Steam's SDL libraries.
+
+The Xbox rumble path was tested with the dongle: SDL detected the controller, a rumble pulse reached the motors, and a stop command stopped them. The bridge sends 8-byte reports to interrupt OUT endpoint `0x05`.
+
+### Prerequisites (Dependencies)
+
+Before running `install.sh`, install the build dependencies for your distribution:
+
+- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
+  ```bash
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build pkg-config libusb-1.0-0-dev libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
+  ```
+- **Fedora / Nobara / Bazzite**:
+  ```bash
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build pkgconf-pkg-config libusb1-devel libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
+  ```
+- **Arch Linux / Manjaro / EndeavourOS**:
+  ```bash
+  sudo pacman -S --needed git base-devel cmake ninja pkgconf libusb libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
+  ```
+- **openSUSE**:
+  ```bash
+  sudo zypper install -y git gcc gcc-c++ cmake ninja pkgconf-pkg-config libusb-1_0-devel libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
+  ```
+
+### Padctl
+
+The installer no longer downloads or configures Padctl. Install it separately if you need its virtual Xbox controller or custom mappings. Its default configuration behaves like an Xbox Elite Series 2 controller. For custom paddle mappings, macros, or stick curves, edit `~/.config/padctl/config.toml` or use the Padctl CLI. See the [Padctl documentation](https://github.com/BANANASJIM/padctl).
+
+### Credits & References
+
+- [BANANASJIM/padctl](https://github.com/BANANASJIM/padctl) — Research on the Vader 5 Pro dongle and its HID input interface.
+- [firefloc, vader5-pro-linux-fix issue #8](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8) — Steam SDL replacement and file-size adjustment method.
+- [Vader 5 Pro dongle protocol](https://github.com/Chillsmeit/vader5pro-remap-driver/blob/main/docs/protocol.md) — Xbox interface report format.
+
+### Installation
+
+```bash
+git clone https://github.com/AltMugen/flydigi-vader5-pro-linux.git
+cd flydigi-vader5-pro-linux
+chmod +x build.sh install.sh vader5
+./build.sh
+```
+
+Close Steam before installing the patched libraries:
+
+```bash
+./install.sh
+```
+
+The default build is 64-bit. To build the 32-bit SDL library as well, install your distribution's multilib dependencies and run `BUILD_32=1 ./build.sh`.
+
+Steam's original SDL library is saved beside the patched file as `libSDL3.so.0.vader5-original`. The updater will not replace a library if the patched SDL is larger than the original or the Steam `sdl3_shim.so` file is missing.
+
+`vader5 update` changes files under the current user's Steam directory and does not need root when that directory is user-owned. Installing the udev rule and switching modes use `sudo`.
+
+### CLI Usage (`vader5`)
+
+```bash
+vader5 native   # (or 'vader5 n') Switch to Steam Native mode
+vader5 padctl   # (or 'vader5 p') Switch to Padctl mode
+vader5 update   # (or 'vader5 u') Re-apply patched SDL3 libraries to Steam
+vader5 status   # (or 'vader5 s') Show the current mode
+```
+
+The Vader 5 Pro dongle firmware must be at least `0x7141`; the tested dongle reported `0x7153`.
+
+---
+
+## Русский
+
+Поддержка и исправления для **Flydigi Vader 5 Pro** на Linux (2.4G-донгл, USB ID `37d7:2401`).
+
+### Что входит в репозиторий
+
+- **Фикс ввода и вибрации SDL3**: SDL читает дополнительные кнопки и гироскоп через HID-интерфейс 1. Вибрация отправляется через отдельный Xbox-интерфейс 0 донгла. Драйвер `xpad` отключается от этого интерфейса, чтобы Steam не видел второй геймпад. Прежняя схема вибрации повторными залпами больше не используется.
+- **Утилита переключения (`vader5`)**: Переключение между режимами Steam Native и Padctl. Сообщения утилиты выводятся на языке системы — русском или английском.
+- **Сборка SDL и установщик**: Собирает пропатченную SDL3 из закреплённого тега `release-3.4.4`, устанавливает сервис вибрации и правила `udev`, затем обновляет библиотеки SDL в Steam.
+
+Вибрация через Xbox-интерфейс проверена на донгле: SDL обнаружила контроллер, тестовый импульс вызвал вибрацию, команда остановки остановила моторы. Сервис отправляет 8-байтные команды на interrupt OUT endpoint `0x05`.
+
+### Требования (Зависимости)
+
+Перед запуском `install.sh` установите зависимости для своей системы:
+
+- **Ubuntu / Debian / Pop!_OS / Linux Mint**:
+  ```bash
+  sudo apt update && sudo apt install -y git build-essential cmake ninja-build pkg-config libusb-1.0-0-dev libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxrender-dev libxinerama-dev libxss-dev libxtst-dev
+  ```
+- **Fedora / Nobara / Bazzite**:
+  ```bash
+  sudo dnf install -y git gcc gcc-c++ cmake ninja-build pkgconf-pkg-config libusb1-devel libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXScrnSaver-devel libXtst-devel
+  ```
+- **Arch Linux / Manjaro / EndeavourOS**:
+  ```bash
+  sudo pacman -S --needed git base-devel cmake ninja pkgconf libusb libx11 libxext libxcursor libxi libxfixes libxrandr libxrender libxinerama libxss libxtst
+  ```
+- **openSUSE**:
+  ```bash
+  sudo zypper install -y git gcc gcc-c++ cmake ninja pkgconf-pkg-config libusb-1_0-devel libX11-devel libXext-devel libXcursor-devel libXi-devel libXfixes-devel libXrandr-devel libXrender-devel libXinerama-devel libXss-devel libXtst-devel
+  ```
+
+### Padctl
+
+Установщик больше не скачивает и не настраивает Padctl автоматически. Если нужен виртуальный Xbox-геймпад или собственные назначения, установите Padctl отдельно. По умолчанию он работает как Xbox Elite Series 2. Для настройки лепестков, макросов и кривых стиков отредактируйте `~/.config/padctl/config.toml` или воспользуйтесь CLI. Инструкции есть в [документации Padctl](https://github.com/BANANASJIM/padctl).
+
+### Благодарности и ссылки
+
+- [BANANASJIM/padctl](https://github.com/BANANASJIM/padctl) — Исследование донгла Vader 5 Pro и его HID-интерфейса ввода.
+- [firefloc, vader5-pro-linux-fix issue #8](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8) — Метод подмены SDL в Steam с подгонкой размера файла.
+- [Протокол донгла Vader 5 Pro](https://github.com/Chillsmeit/vader5pro-remap-driver/blob/main/docs/protocol.md) — Формат команд Xbox-интерфейса.
+
+### Установка
+
+```bash
+git clone https://github.com/AltMugen/flydigi-vader5-pro-linux.git
+cd flydigi-vader5-pro-linux
+chmod +x build.sh install.sh vader5
+./build.sh
+```
+
+Перед установкой пропатченных библиотек закройте Steam:
+
+```bash
+./install.sh
+```
+
+По умолчанию собирается 64-битная SDL. Чтобы собрать также 32-битную библиотеку, установите multilib-зависимости своего дистрибутива и запустите `BUILD_32=1 ./build.sh`.
+
+Оригинальная библиотека Steam сохраняется рядом с пропатченной под именем `libSDL3.so.0.vader5-original`. Обновление не заменит библиотеку, если новая SDL больше оригинала или отсутствует штатный файл Steam `sdl3_shim.so`.
+
+`vader5 update` меняет файлы в каталоге Steam текущего пользователя и не требует root, если каталог принадлежит пользователю. Установка правила `udev` и переключение режимов используют `sudo`.
+
+### Использование (`vader5`)
+
+```bash
+vader5 native   # (или 'vader5 n') Включить нативный режим Steam
+vader5 padctl   # (или 'vader5 p') Включить режим Padctl
+vader5 update   # (или 'vader5 u') Обновить пропатченные библиотеки SDL3 в Steam
+vader5 status   # (или 'vader5 s') Показать текущий режим
+```
+
+Прошивка донгла Vader 5 Pro должна быть не ниже `0x7141`; на проверенном донгле была версия `0x7153`.

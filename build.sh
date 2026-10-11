@@ -40,6 +40,9 @@ if [[ "${BUILD_32:-0}" == 1 ]]; then
         -DCMAKE_C_FLAGS=-m32 -DCMAKE_SHARED_LINKER_FLAGS=-m32
     cmake --build "$RUN_BUILD/steam32" --parallel "$(nproc)"
     install -m 0644 "$RUN_BUILD/steam32/libSDL3.so.0" "$OUTPUT_DIR/libSDL3-32.so.0"
+    touch "$OUTPUT_DIR/32-bit-build.enabled"
+else
+    rm -f "$OUTPUT_DIR/32-bit-build.enabled"
 fi
 
 echo "Built SDL and rumble bridge. Run ./install.sh to install rules and patch Steam."
