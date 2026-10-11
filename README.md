@@ -8,7 +8,7 @@
 
 ### Состояние и ограничения
 
-- Путь вибрации через Xbox endpoint проверен на подключённом донгле: сервис открыл интерфейс 0 и передал 8-байтные импульс и stop-команду на endpoint `0x05` без ошибок libusb. Отдельно подтверждается, что моторы физически отреагировали на импульс. SDL передаёт значения моторов сервису через сокет в `XDG_RUNTIME_DIR`. В этом пути нет тройного залпа, задержки 20–22 мс или записи вибрации в HID-интерфейс 1.
+- Путь вибрации через Xbox endpoint проверен на подключённом донгле: SDL обнаружила контроллер, вызов rumble прошёл через пользовательский сервис, а моторы отреагировали на импульс и остановились по stop-команде. Донгл сообщил версию прошивки `0x7153` (минимум драйвера — `0x7141`). Сервис передаёт стандартные 8-байтные команды на endpoint `0x05`, а SDL передаёт ему значения моторов через сокет в `XDG_RUNTIME_DIR`. В этом пути нет тройного залпа, задержки 20–22 мс или записи вибрации в HID-интерфейс 1.
 - Сборка закреплена за SDL `release-3.4.4`. Патч хранится в [`patches/sdl-flydigi-vader5-linux.patch`](patches/sdl-flydigi-vader5-linux.patch), а не генерируется заменами текста в установщике.
 - По умолчанию собирается 64-битная библиотека для `steamrt64` и `ubuntu12_64`. Для 32-битной поставьте multilib-зависимости и запустите `BUILD_32=1 ./build.sh`. Без неё `ubuntu12_32` пропускается.
 - Библиотека, собранная на Fedora, может требовать её версию glibc. Перед применением к другой системе проверьте `readelf --version-info` или соберите в совместимом Steam Runtime SDK. Указанный [разбор Steam Runtime](https://github.com/DuncanTPerkins/vader5-pro-linux-fix/issues/8) также сообщает о минимальной прошивке Vader 5 Pro `0x7141`.
@@ -47,7 +47,7 @@ journalctl --user -u vader5-rumble -b
 
 ## English
 
-This repository configures the Flydigi Vader 5 Pro `37d7:2401` dongle for native Steam. SDL reads extra buttons and gyro through HID interface 1. A user service sends rumble to the separate Xbox interface 0 while `xpad` is unbound, avoiding a duplicate controller. The dongle accepted the rumble and stop transfers; physical motor response is still being confirmed.
+This repository configures the Flydigi Vader 5 Pro `37d7:2401` dongle for native Steam. SDL reads extra buttons and gyro through HID interface 1. A user service sends rumble to the separate Xbox interface 0 while `xpad` is unbound, avoiding a duplicate controller. SDL-to-service rumble, the dongle transfer, and the physical motor response have been verified on hardware.
 
 On Fedora, install the build dependencies shown above, then run `./build.sh` and `./install.sh` with Steam closed. Use `vader5 native`, `vader5 padctl` (when padctl is installed separately), `vader5 update`, and `vader5 status`. Steam's original SDL files are backed up beside the replaced files. The default build is 64-bit; set `BUILD_32=1` after installing multilib dependencies to add 32-bit Steam support.
 
